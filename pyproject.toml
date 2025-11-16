@@ -1,0 +1,35 @@
+[project]
+name = "zgc3-ai-assistant"
+version = "0.1.0"
+description = "Gradio-based assistant that orchestrates DashScope models, local RAG, and Bilibili search."
+authors = [{ name = "ZGC3 AI Lab" }]
+requires-python = ">=3.11"
+readme = "README.md"
+dependencies = [
+    "dashscope",
+    "faiss-cpu",
+    "gradio>=4.44.0",
+    "httpx",
+    "pydantic>=2.6",
+    "pydantic-settings>=2.5",
+    "python-dotenv",
+    "rich",
+    "yt-dlp",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "pytest",
+    "ruff",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+preview = true
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+pythonpath = ["."]
+

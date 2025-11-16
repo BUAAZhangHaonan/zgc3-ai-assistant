@@ -1,0 +1,22 @@
+name: zgc3-assistant
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - numpy
+  - tqdm
+  - pip:
+      - dashscope
+      - gradio>=4.44.0
+      - httpx
+      - pydantic>=2.6
+      - pydantic-settings>=2.5
+      - python-dotenv
+      - faiss-cpu
+      - yt-dlp
+      - rich
+      - black
+      - ruff
+      - pytest
