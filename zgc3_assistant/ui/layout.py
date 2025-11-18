@@ -22,6 +22,15 @@ def _format_sources(sources: List[dict]) -> str:
     return "\n\n".join(lines)
 
 
+# --- MODIFICATION START ---
+# 新增一个辅助函数，用于将秒数格式化为 MM:SS
+def _format_duration(seconds: int) -> str:
+    if not isinstance(seconds, (int, float)) or seconds <= 0:
+        return "N/A"
+    m, s = divmod(seconds, 60)
+    return f"{int(m):02d}:{int(s):02d}"
+
+
 def _format_bili_cards(items: List[dict]) -> str:
     if not items:
         return "<div class='empty-state'>暂无 B 站搜索结果</div>"
@@ -32,9 +41,9 @@ def _format_bili_cards(items: List[dict]) -> str:
                 f"""
                 <div class='bili-card card'>
                     <a href="{item.get('url')}" target="_blank">
-                        <img src="{item.get('cover')}" alt="{item.get('title')}"/>
+                        <img src="{item.get('cover')}" alt="图片加载失败" referrerpolicy="no-referrer"/>
                         <h4>{item.get('title')}</h4>
-                        <p>{item.get('uploader')} · {item.get('duration', 0)}s</p>
+                        <p>{item.get('uploader')}   {_format_duration(item.get('duration', 0))}s</p>
                     </a>
                 </div>
             """

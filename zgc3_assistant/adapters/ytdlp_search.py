@@ -31,12 +31,13 @@ class YtDlpSearcher:
         self.executable = executable
         self.timeout = timeout
 
-    def search(self, keyword: str, limit: int = 8) -> List[BiliVideo]:
+    def search(self, keyword: str, limit: int) -> List[BiliVideo]:
         keyword = keyword.strip()
         if not keyword:
             return []
-        query = f"bilisearch{limit}:{keyword}"
-        cmd = [self.executable, "--dump-json", query]
+        query = f"bilisearch{limit+2}:{keyword}"
+        # 添加了 "-i" 或 "--ignore-errors" 参数，让 yt-dlp 在遇到无法解析的视频时跳过而不是退出
+        cmd = [self.executable, "-i", "--dump-json", query]
         try:
             completed = subprocess.run(
                 cmd,
@@ -52,7 +53,8 @@ class YtDlpSearcher:
             LOGGER.error("yt-dlp search timed out for keyword %s", keyword)
             return []
 
-        if completed.returncode != 0:
+        # 返回码异常时输出warning，但只要stdout中有数据，我们就认为这是一个部分成功（因为加了-i参数）
+        if completed.returncode != 0 and not completed.stdout:
             LOGGER.warning("yt-dlp exited with %s: %s", completed.returncode, completed.stderr)
             return []
 
@@ -69,7 +71,8 @@ class YtDlpSearcher:
             video = self._parse_video(payload)
             if video:
                 videos.append(video)
-        return videos
+        # 返回的数量有时候不准，限制到limit以内
+        return videos[:limit]
 
     def _parse_video(self, payload: dict) -> Optional[BiliVideo]:
         title = payload.get("title")

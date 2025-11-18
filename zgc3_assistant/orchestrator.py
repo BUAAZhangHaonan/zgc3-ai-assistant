@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import base64
 import logging
 import time
 from typing import Iterable, List, Optional
+
+import requests
 
 from zgc3_assistant.adapters.dashscope_client import DashScopeClient
 from zgc3_assistant.adapters.ytdlp_search import YtDlpSearcher
@@ -52,7 +55,7 @@ class Orchestrator:
         sources = self._collect_context(query, client)
         context_text = "\n\n".join(f"[{idx+1}] {src['text']}" for idx, src in enumerate(sources))
         system_prompt = (
-            "你是中关村第三小学的校史讲解员，请用小学生能理解的语言回答家长与学生的问题。"
+            "你是中关村第三小学的校史讲解智能助手，请用耐心、清晰、友好的语气回答学生的问题。。"
         )
         user_prompt = f"问题：{query}\n\n参考资料：\n{context_text or '（暂无）'}"
         messages = [
@@ -93,22 +96,58 @@ class Orchestrator:
         if not reordered:
             reordered = hits[: self.settings.rerank_top_k]
         return reordered
+    
+    
+    def _cache_cover_as_base64(self, url: str) -> str:
+        """Downloads a cover image with retries and returns it as a Base64 Data URI."""
+        if not url:
+            return ""
 
-    def search_bilibili(self, keyword: str, top_k: int = 8) -> List[dict]:
+        headers = {
+            "Referer": "https://www.bilibili.com/",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+        
+        # --- 核心修改：实现带延迟的重试机制 ---
+        total_attempts = 3
+        for attempt in range(total_attempts):
+            try:
+                response = requests.get(url, timeout=10, headers=headers)
+                response.raise_for_status() # 如果请求失败 (如 412, 404, 500), 会在这里抛出异常
+                
+                # 如果成功，则处理数据并立刻返回，跳出循环
+                content_type = response.headers.get('Content-Type', 'image/jpeg')
+                encoded_image = base64.b64encode(response.content).decode('utf-8')
+                return f"data:{content_type};base64,{encoded_image}"
+
+            except Exception as e:
+                # 记录每次失败的尝试
+                LOGGER.warning(
+                    f"Failed to cache cover (attempt {attempt + 1}/{total_attempts}) for {url}: {e}"
+                )
+                # 如果不是最后一次尝试，则等待一小段时间再重试
+                if attempt < total_attempts - 1:
+                    time.sleep(0.5)
+
+        # 如果所有尝试都失败了，则返回空字符串
+        return ""
+
+    def search_bilibili(self, keyword: str) -> List[dict]:
         keyword = (keyword or "").strip()
         if not keyword:
             return []
         cached = self.cache_manager.get_bilibili_cache(keyword) or []
         if cached:
-            return cached[:top_k]
+            return cached[:self.settings.bili_search_limit]
         if not self.settings.enable_ytdlp:
             return []
-        limit = min(top_k, self.settings.bili_max_results)
-        videos = self.ytdlp_searcher.search(keyword, limit=limit)
+        videos = self.ytdlp_searcher.search(keyword, limit=self.settings.bili_search_limit)
         payload = [video.to_dict() for video in videos]
+        for item in payload:
+            item["cover"] = self._cache_cover_as_base64(item.get("cover", ""))
         if payload:
-            self.cache_manager.set_bilibili_cache(keyword, payload)
-        return payload[:top_k]
+            self.cache_manager.set_bilibili_cache(keyword, payload, max_keys=self.settings.bili_cache_max_keys)
+        return payload
 
     def gen_image(self, prompt: str, size: str = "1328*1328") -> dict:
         if not self.settings.enable_image_gen:

@@ -21,9 +21,8 @@ class Settings(BaseSettings):
     model_image: str = "qwen-image-plus"
     model_i2v: str = "wan2.5-i2v-preview"
 
-    rag_chunk_size: int = 800
-    rag_chunk_overlap: int = 120
-    rag_top_k: int = 6
+    rag_chunk_size: int = 250
+    rag_top_k: int = 10
     rerank_top_k: int = 3
 
     enable_ytdlp: bool = True
@@ -31,7 +30,12 @@ class Settings(BaseSettings):
     enable_video_gen: bool = False
 
     log_level: str = "INFO"
-    bili_max_results: int = 8
+    
+    # --- 核心修改 ---
+    # 1. bili_max_results 更名为 bili_search_limit，作为唯一的数量控制参数
+    bili_search_limit: int = 8
+    # 2. 新增B站搜索缓存中最多保存的关键词数量
+    bili_cache_max_keys: int = 10
 
     base_dir: Path = Field(default=BASE_DIR)
     rag_data_dir: Path = Field(default_factory=lambda: BASE_DIR / "rag_data")
