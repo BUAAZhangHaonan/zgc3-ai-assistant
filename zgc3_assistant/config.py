@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     rag_top_k: int = 10
     rerank_top_k: int = 3
 
+    enable_show_sources: bool = False  #是否在回答末尾显示“参考资料”板块
     enable_ytdlp: bool = True
     enable_image_gen: bool = True
     enable_video_gen: bool = False

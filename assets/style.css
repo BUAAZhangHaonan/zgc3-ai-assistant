@@ -1,5 +1,5 @@
 .gradio-container {
-  background: url('/file=assets/bg_school.jpg') center/cover no-repeat fixed;
+  background: url('/file=assets/zgc3_background.jpg') center/cover no-repeat fixed;
   min-height: 100vh;
 }
 
@@ -11,26 +11,61 @@
   text-align: center;
 }
 
-.card {
-  border-radius: 14px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-  padding: 12px;
-  margin-bottom: 12px;
-  background: rgba(255, 255, 255, 0.9);
+/* --- B 站卡片高度统一 --- */
+
+.bili-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1.5rem;
+}
+
+.bili-card {
+    border-radius: 12px;
+    overflow: hidden;
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    border: 1px solid #e5e7eb;
+}
+
+.bili-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.08);
+}
+
+.bili-card a {
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    height: 100%; /* 让 a 标签撑满卡片 */
 }
 
 .bili-card img {
-  width: 100%;
-  border-radius: 10px;
-  display: block;
-  margin-bottom: 8px;
+    width: 100%;
+    aspect-ratio: 16 / 9; /* 固定图片宽高比 */
+    object-fit: cover;
 }
 
-.bili-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 12px;
+/* 核心：卡片标题样式，实现多行省略 */
+.bili-card h4 {
+    margin: 0.75rem 0.75rem 0.5rem;
+    font-size: 1rem;
+    line-height: 1.4;
+    font-weight: 600;
+    
+    /* --- 实现高度统一的关键代码 --- */
+    height: 2.8em; /* 1.4 * 2 = 2.8em，强制设置为 2 行的高度 */
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2; /* 最多显示 2 行 */
+    -webkit-box-orient: vertical;
+    text-overflow: ellipsis;
 }
+
+/* 卡片底部信息 */
+.bili-card p {
+    margin: 0 0.75rem 0.75rem;
+    font-size: 0.8rem;
+    color: #6b7280;
+    margin-top: auto; /* 将 p 推到卡片底部，进一步辅助对齐 */
+}```
 
