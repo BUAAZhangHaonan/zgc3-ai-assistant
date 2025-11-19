@@ -26,16 +26,21 @@ def build_index(
     if not chunks:
         raise RuntimeError(f"No markdown documents found under {data_dir}")
 
-    dashscope_client = DashScopeClient(api_key=settings.dashscope_api_key, settings=settings)
-    embeddings = dashscope_client.embed_texts(chunk.content for chunk in chunks)
+    dashscope_client = DashScopeClient(
+        api_key=settings.dashscope_api_key, settings=settings)
+    embeddings = dashscope_client.embed_texts(
+        chunk.content for chunk in chunks)
     LOGGER.info("Embedding %s chunks for RAG store", len(chunks))
     return RAGStore.build_and_save(chunks, embeddings, index_dir)
 
 
 def _make_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Build FAISS index for zgc3 assistant.")
-    parser.add_argument("--data-dir", type=Path, default=None, help="Directory with markdown files.")
-    parser.add_argument("--index-dir", type=Path, default=None, help="Output directory for FAISS index.")
+    parser = argparse.ArgumentParser(
+        description="Build FAISS index for zgc3 assistant.")
+    parser.add_argument("--data-dir", type=Path, default=None,
+                        help="Directory with markdown files.")
+    parser.add_argument("--index-dir", type=Path, default=None,
+                        help="Output directory for FAISS index.")
     return parser
 
 
@@ -48,4 +53,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

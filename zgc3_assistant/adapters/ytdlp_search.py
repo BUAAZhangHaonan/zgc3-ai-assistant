@@ -55,7 +55,8 @@ class YtDlpSearcher:
 
         # 返回码异常时输出warning，但只要stdout中有数据，我们就认为这是一个部分成功（因为加了-i参数）
         if completed.returncode != 0 and not completed.stdout:
-            LOGGER.warning("yt-dlp exited with %s: %s", completed.returncode, completed.stderr)
+            LOGGER.warning("yt-dlp exited with %s: %s",
+                           completed.returncode, completed.stderr)
             return []
 
         videos: List[BiliVideo] = []
@@ -77,7 +78,8 @@ class YtDlpSearcher:
     def _parse_video(self, payload: dict) -> Optional[BiliVideo]:
         title = payload.get("title")
         url = payload.get("webpage_url")
-        cover = payload.get("thumbnail") or self._first_thumbnail(payload.get("thumbnails"))
+        cover = payload.get("thumbnail") or self._first_thumbnail(
+            payload.get("thumbnails"))
         if not title or not url:
             return None
         return BiliVideo(

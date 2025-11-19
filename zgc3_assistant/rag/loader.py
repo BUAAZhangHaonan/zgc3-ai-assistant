@@ -54,10 +54,11 @@ def semantic_chunker(text: str, chunk_size: int) -> Iterator[str]:
 
             # 1.2 然后，对这个长段落按句子进行细分
             sentences = re.split(r"([。\.!\?\n])", paragraph)
-            sentences = ["".join(s).strip() for s in zip(sentences[0::2], sentences[1::2])]
+            sentences = ["".join(s).strip()
+                         for s in zip(sentences[0::2], sentences[1::2])]
             sentences = [s for s in sentences if s]
 
-            if not sentences: # 如果没有句子，则直接产出这个长段落
+            if not sentences:  # 如果没有句子，则直接产出这个长段落
                 yield paragraph
                 continue
 
@@ -68,7 +69,7 @@ def semantic_chunker(text: str, chunk_size: int) -> Iterator[str]:
                     current_sentence_group = [sentence]
                 else:
                     current_sentence_group.append(sentence)
-            
+
             if current_sentence_group:
                 yield " ".join(current_sentence_group)
 
@@ -98,7 +99,7 @@ def load_markdown_documents(
 
     for file_path in _iter_markdown_files(data_dir):
         content = file_path.read_text(encoding="utf-8").strip()
-        
+
         for idx, chunk_content in enumerate(
             semantic_chunker(content, chunk_size)
         ):
@@ -121,5 +122,5 @@ def load_markdown_documents(
         LOGGER.info(f"Chunk 分割结果已保存到: {output_file.resolve()}")
     except Exception as e:
         LOGGER.error(f"无法保存 chunk 预览文件: {e}")
-            
+
     return chunks

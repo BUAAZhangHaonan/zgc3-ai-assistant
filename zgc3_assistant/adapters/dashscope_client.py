@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import importlib
-import json
 import logging
 from http import HTTPStatus
 from typing import Any, Dict, Iterable, Iterator, List, Sequence
@@ -10,12 +9,14 @@ from zgc3_assistant.config import Settings
 
 EMBEDDING_BATCH_SIZE = 10
 
+
 class DashScopeClient:
     """封装对DashScope SDK的所有调用。"""
 
     def __init__(self, api_key: str | None, settings: Settings):
         if not api_key:
-            raise ValueError("DashScope API key is required. Set DASHSCOPE_API_KEY.")
+            raise ValueError(
+                "DashScope API key is required. Set DASHSCOPE_API_KEY.")
         self.settings = settings
         self.api_key = api_key
         self._logger = logging.getLogger(__name__)
@@ -32,13 +33,14 @@ class DashScopeClient:
             raise RuntimeError("dashscope package is not installed") from exc
 
     def _call_and_validate_api(self, api_callable, log_message: str, **kwargs) -> Any:
-        # ... (此方法保持不变) ...
         self._logger.info(f"正在调用 DashScope API: {log_message}...")
         try:
             response = api_callable(api_key=self.api_key, **kwargs)
         except Exception as e:
-            self._logger.error(f"调用 DashScope API ({log_message}) 时发生异常: %s", e, exc_info=True)
-            raise RuntimeError(f"DashScope API call ({log_message}) failed with exception: {e}") from e
+            self._logger.error(
+                f"调用 DashScope API ({log_message}) 时发生异常: %s", e, exc_info=True)
+            raise RuntimeError(
+                f"DashScope API call ({log_message}) failed with exception: {e}") from e
 
         if kwargs.get("stream"):
             self._logger.info(f"DashScope API ({log_message}) 以流式模式启动。")
@@ -53,11 +55,10 @@ class DashScopeClient:
             raise RuntimeError(
                 f"DashScope API Error ({log_message}): {response.message} (Code: {response.code})"
             )
-        
+
         self._logger.info(f"DashScope API ({log_message}) 调用成功。")
         return response
-    
-    # --- 核心调试区域 ---
+
     def chat_omni_stream(self, messages: Sequence[dict], **kwargs) -> Iterator[str]:
         """
         以流式方式调用对话模型，并逐块返回文本内容。
@@ -71,8 +72,7 @@ class DashScopeClient:
             result_format="text",
             **kwargs,
         )
-        
-        # --- 核心修改：移除这里的逐块日志 ---
+
         for response in response_generator:
             if response.status_code == HTTPStatus.OK:
                 text_chunk = self._extract_text(response)
@@ -97,11 +97,12 @@ class DashScopeClient:
 
     def embed_texts(self, texts: Iterable[str]) -> List[List[float]]:
         payload = [text for text in texts if text and not text.isspace()]
-        if not payload: return []
+        if not payload:
+            return []
 
         all_embeddings: List[List[float]] = []
         for i in range(0, len(payload), EMBEDDING_BATCH_SIZE):
-            batch = payload[i : i + EMBEDDING_BATCH_SIZE]
+            batch = payload[i: i + EMBEDDING_BATCH_SIZE]
             log_message = f"Embedding ({self.settings.model_embedding}) - Batch {i//EMBEDDING_BATCH_SIZE + 1}"
 
             response = self._call_and_validate_api(
@@ -111,12 +112,14 @@ class DashScopeClient:
                 input=batch,
                 text_type="document",
             )
-            
+
             output_data = response.output
             if not isinstance(output_data, dict) or "embeddings" not in output_data:
-                raise ValueError(f"Invalid response format from DashScope on batch.")
+                raise ValueError(
+                    "Invalid response format from DashScope on batch.")
 
-            batch_embeddings = [item["embedding"] for item in output_data["embeddings"] if item and "embedding" in item]
+            batch_embeddings = [item["embedding"]
+                                for item in output_data["embeddings"] if item and "embedding" in item]
             all_embeddings.extend(batch_embeddings)
         return all_embeddings
 
@@ -144,9 +147,12 @@ class DashScopeClient:
 
     @staticmethod
     def _ensure_dict(data: Any) -> Dict[str, Any]:
-        if data is None: return {}
-        if isinstance(data, dict): return data
-        if hasattr(data, "to_dict"): return data.to_dict()
+        if data is None:
+            return {}
+        if isinstance(data, dict):
+            return data
+        if hasattr(data, "to_dict"):
+            return data.to_dict()
         return {}
 
     def _extract_text(self, response: Any) -> str:
@@ -166,9 +172,9 @@ class DashScopeClient:
                                     return str(inner_content)
                             if isinstance(content, str):
                                 return content
-        
+
         # 兼容非流式和一些旧的流式格式
         if text := data.get("text"):
             return str(text)
-            
+
         return ""

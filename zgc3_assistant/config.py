@@ -6,14 +6,17 @@ from typing import Optional
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parents[1]
+load_dotenv()
 
 
 class Settings(BaseSettings):
     """Centralized configuration object used across the stack."""
 
-    dashscope_api_key: Optional[str] = Field(default=None, alias="DASHSCOPE_API_KEY")
+    dashscope_api_key: Optional[str] = Field(
+        default=None, alias="DASHSCOPE_API_KEY")
 
     model_chat: str = "qwen3-omni-flash"
     model_embedding: str = "text-embedding-v4"
@@ -25,17 +28,13 @@ class Settings(BaseSettings):
     rag_top_k: int = 10
     rerank_top_k: int = 3
 
-    enable_show_sources: bool = False  #是否在回答末尾显示“参考资料”板块
+    enable_show_sources: bool = False  # 是否在回答末尾显示“参考资料”板块
     enable_ytdlp: bool = True
     enable_image_gen: bool = True
     enable_video_gen: bool = False
 
     log_level: str = "INFO"
-    
-    # --- 核心修改 ---
-    # 1. bili_max_results 更名为 bili_search_limit，作为唯一的数量控制参数
     bili_search_limit: int = 6
-    # 2. 新增B站搜索缓存中最多保存的关键词数量
     bili_cache_max_keys: int = 10
 
     base_dir: Path = Field(default=BASE_DIR)
@@ -44,8 +43,10 @@ class Settings(BaseSettings):
     cache_dir: Path = Field(default_factory=lambda: BASE_DIR / "cache")
     assets_dir: Path = Field(default_factory=lambda: BASE_DIR / "assets")
 
-    demos_file: Path = Field(default_factory=lambda: BASE_DIR / "cache" / "demos.json")
-    search_cache_file: Path = Field(default_factory=lambda: BASE_DIR / "cache" / "search_cache.json")
+    demos_file: Path = Field(
+        default_factory=lambda: BASE_DIR / "cache" / "demos.json")
+    search_cache_file: Path = Field(
+        default_factory=lambda: BASE_DIR / "cache" / "search_cache.json")
 
     yt_dlp_binary: str = "yt-dlp"
     yt_dlp_timeout: int = 25  # seconds
@@ -71,4 +72,3 @@ def get_settings() -> Settings:
     settings = Settings()  # type: ignore[call-arg]
     settings.ensure_directories()
     return settings
-
