@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import asdict
+import os
 from pathlib import Path
 from typing import Iterable, List, Optional
 
@@ -49,9 +49,17 @@ class RAGStore:
         index.add(vectors)
 
         index_dir.mkdir(parents=True, exist_ok=True)
-        faiss.write_index(index, str(index_dir / cls.INDEX_FILENAME))
-        with (index_dir / cls.META_FILENAME).open("w", encoding="utf-8") as fp:
-            json.dump([c.to_dict() for c in chunks], fp, ensure_ascii=False, indent=2)
+
+        # 写入时的目录切换修复
+        origin_cwd = Path.cwd()
+        try:
+            os.chdir(index_dir)
+            faiss.write_index(index, cls.INDEX_FILENAME)
+            with open(cls.META_FILENAME, "w", encoding="utf-8") as fp:
+                json.dump([c.to_dict() for c in chunks], fp, ensure_ascii=False, indent=2)
+        finally:
+            os.chdir(origin_cwd)
+
         LOGGER.info("Saved RAG index with %s chunks to %s", len(chunks), index_dir)
         return cls(index=index, chunks=chunks)
 
@@ -60,13 +68,26 @@ class RAGStore:
         if faiss is None:
             LOGGER.warning("faiss not installed; cannot load RAG index.")
             return None
+        
+        # 先用 Python 的能力检查文件是否存在，这不会报错
         index_path = index_dir / cls.INDEX_FILENAME
         meta_path = index_dir / cls.META_FILENAME
         if not index_path.exists() or not meta_path.exists():
             LOGGER.warning("RAG index directory %s incomplete", index_dir)
             return None
-        index = faiss.read_index(str(index_path))
-        chunk_dicts = json.loads(meta_path.read_text(encoding="utf-8"))
+
+        # 核心修复：在读取 FAISS 索引前，应用与保存时完全相同的目录切换策略
+        origin_cwd = Path.cwd()
+        try:
+            os.chdir(index_dir)
+            
+            # 现在，FAISS 和 JSON 加载都使用相对路径，避免了中文路径问题
+            index = faiss.read_index(cls.INDEX_FILENAME)
+            chunk_dicts = json.loads(Path(cls.META_FILENAME).read_text(encoding="utf-8"))
+
+        finally:
+            os.chdir(origin_cwd)
+        
         chunks = [DocumentChunk(**item) for item in chunk_dicts]
         return cls(index=index, chunks=chunks)
 

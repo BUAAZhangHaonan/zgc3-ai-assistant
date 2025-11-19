@@ -21,8 +21,7 @@ def build_index(
     index_dir = (index_dir or settings.rag_index_dir).resolve()
     chunks = load_markdown_documents(
         data_dir=data_dir,
-        chunk_size=settings.rag_chunk_size,
-        chunk_overlap=settings.rag_chunk_overlap,
+        chunk_size=settings.rag_chunk_size
     )
     if not chunks:
         raise RuntimeError(f"No markdown documents found under {data_dir}")
