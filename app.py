@@ -14,7 +14,7 @@ def main() -> None:
     configure_logging(settings.log_level)
     orchestrator = Orchestrator(settings=settings)
     ui = build_app(orchestrator)
-    ui.queue().launch()
+    ui.queue().launch(allowed_paths=["assets"])
 
 
 if __name__ == "__main__":

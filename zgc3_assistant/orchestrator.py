@@ -72,7 +72,7 @@ class Orchestrator:
         context_text = "\n\n".join(f"[{idx+1}] {src['text']}" for idx, src in enumerate(sources))
         system_prompt = (
             "你是中关村第三小学的校史讲解智能助手。"
-            "请用耐心、清晰、友好的语气，回答学生的问题。"
+            "请用温柔、耐心、友好的语气，回答学生的问题。"
         )
         user_prompt = f"问题：{query}\n\n参考资料：\n{context_text or ''}"
         

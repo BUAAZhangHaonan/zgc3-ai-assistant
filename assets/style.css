@@ -1,34 +1,82 @@
-.gradio-container {
-  background: url('/file=assets/zgc3_background.jpg') center/cover no-repeat fixed;
-  min-height: 100vh;
+/* style.css */
+
+/* 1. 主内容区域 - 毛玻璃卡片 */
+#main-container {
+    max-width: 1100px;
+    /* 上下留出 margin，保证不贴边 */
+    margin: 4vh auto !important; 
+    padding: 30px 40px !important;
+    
+    /* 取消 max-height 限制，允许高度随内容（如B站搜索）自动伸缩 */
+    height: auto !important;
+    min-height: 60vh; 
+    overflow: visible !important; 
+    
+    /* 背景调低不透明度，配合模糊让整体更透气 */
+    background: rgba(255, 255, 255, 0.6) !important;
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    
+    border-radius: 24px;
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.6);
 }
 
+/* 2. 聊天窗口 - 大幅增加透明度 */
+#chat-window {
+    /* 透明度降至 0.25，让背景图透出来 */
+    background: rgba(255, 255, 255, 0.3) !important;
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+    border-radius: 12px;
+}
+
+/* 强制按钮不换行 */
+button {
+    white-space: nowrap !important;
+}
+
+/* 3. 标题样式 */
+h1 {
+    color: #1a202c !important;
+    text-shadow: 0 2px 4px rgba(255,255,255,0.9);
+}
+
+/* --- B站卡片样式 --- */
 .empty-state,
 .error {
-  padding: 24px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.8);
-  text-align: center;
+    padding: 20px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.5); 
+    border: 1px dashed #9ca3af;
+    text-align: center;
+    color: #4b5563;
+    font-size: 0.9rem;
 }
-
-/* --- B 站卡片高度统一 --- */
 
 .bili-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 1.5rem;
+    /* --- 核心修改 --- */
+    /* 将 minmax(220px, ...) 改为 170px */
+    /* 原理：告诉浏览器，只要空间够放 170px 宽的卡片，就尽量多放。这样一行就能塞下 3 个了 */
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    
+    /* 保持原有的间距设置 */
+    gap: 1rem;
+    padding: 10px 0;
 }
 
 .bili-card {
+    background: rgba(255, 255, 255, 0.95); 
     border-radius: 12px;
     overflow: hidden;
-    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    transition: all 0.3s ease;
     border: 1px solid #e5e7eb;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
 }
 
 .bili-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 10px 20px rgba(0,0,0,0.08);
+    transform: translateY(-4px);
+    box-shadow: 0 12px 20px rgba(0,0,0,0.15);
 }
 
 .bili-card a {
@@ -36,36 +84,37 @@
     color: inherit;
     display: flex;
     flex-direction: column;
-    height: 100%; /* 让 a 标签撑满卡片 */
+    height: 100%;
 }
 
 .bili-card img {
     width: 100%;
-    aspect-ratio: 16 / 9; /* 固定图片宽高比 */
+    aspect-ratio: 16 / 9;
     object-fit: cover;
+    display: block;
 }
 
-/* 核心：卡片标题样式，实现多行省略 */
 .bili-card h4 {
-    margin: 0.75rem 0.75rem 0.5rem;
-    font-size: 1rem;
+    margin: 0.7rem;
+    font-size: 0.95rem;
     line-height: 1.4;
     font-weight: 600;
-    
-    /* --- 实现高度统一的关键代码 --- */
-    height: 2.8em; /* 1.4 * 2 = 2.8em，强制设置为 2 行的高度 */
+    color: #1f2937;
+    height: 2.8em;
     overflow: hidden;
     display: -webkit-box;
-    -webkit-line-clamp: 2; /* 最多显示 2 行 */
+    -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     text-overflow: ellipsis;
 }
 
-/* 卡片底部信息 */
 .bili-card p {
-    margin: 0 0.75rem 0.75rem;
+    margin: 0 0.7rem 0.7rem;
     font-size: 0.8rem;
     color: #6b7280;
-    margin-top: auto; /* 将 p 推到卡片底部，进一步辅助对齐 */
-}```
+    margin-top: auto;
+    display: flex;
+    justify-content: space-between;
+}
 
+footer { display: none !important; }

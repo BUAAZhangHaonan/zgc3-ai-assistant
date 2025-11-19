@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     
     # --- 核心修改 ---
     # 1. bili_max_results 更名为 bili_search_limit，作为唯一的数量控制参数
-    bili_search_limit: int = 8
+    bili_search_limit: int = 6
     # 2. 新增B站搜索缓存中最多保存的关键词数量
     bili_cache_max_keys: int = 10
 
