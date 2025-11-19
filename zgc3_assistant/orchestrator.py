@@ -84,7 +84,7 @@ class Orchestrator:
         messages.extend(history)
         messages.append({"role": "user", "content": user_prompt})
 
-        # --- 核心修改：在这里打印完整的输入 ---
+        # 打印完整的输入
         self._logger.info("向大模型发送的完整消息: %s", messages)
 
         full_response = ""
@@ -92,7 +92,7 @@ class Orchestrator:
             full_response += chunk
             yield {"type": "text_chunk", "content": chunk}
 
-        # --- 核心修改：在这里打印完整的输出 ---
+        # 打印完整的输出
         self._logger.info("流式响应完成，收到的完整回答: %s", repr(full_response))
 
     def _collect_context(self, query: str, client: DashScopeClient) -> List[dict]:
@@ -129,7 +129,7 @@ class Orchestrator:
         for item in reranked:
             score = item.get("score", 0.0)
 
-            # --- 核心修改：增加分数阈值检查 ---
+            # 打印每个文档的分数以便调试
             if score < score_threshold:
                 continue  # 如果分数低于阈值，则跳过此文档
 
@@ -151,7 +151,7 @@ class Orchestrator:
 
         return reordered
 
-    # --- B 站视频搜索核心逻辑 (完整保留) ---
+    # B站视频搜索核心逻辑
     def search_bilibili(self, keyword: str) -> List[dict]:
         """搜索 B 站视频，并处理缓存。"""
         keyword = (keyword or "").strip()
