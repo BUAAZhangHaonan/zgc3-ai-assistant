@@ -19,6 +19,7 @@ class Settings(BaseSettings):
         default=None, alias="DASHSCOPE_API_KEY")
 
     model_chat: str = "qwen3-omni-flash"
+    # model_chat: str = "qwen-flash"
     model_embedding: str = "text-embedding-v4"
     model_rerank: str = "qwen3-rerank"
     model_image: str = "qwen-image-plus"
