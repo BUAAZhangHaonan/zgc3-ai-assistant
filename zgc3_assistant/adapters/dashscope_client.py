@@ -22,7 +22,7 @@ class DashScopeClient:
         self._logger = logging.getLogger(__name__)
         self._sdk = self._load_sdk()
         self._sdk.api_key = api_key
-        self._multimodal = getattr(self._sdk, "MultiModalConversation")
+        self._generation = getattr(self._sdk, "Generation")
         self._embedding = getattr(self._sdk, "TextEmbedding")
         self._rerank = getattr(self._sdk, "TextReRank")
 
@@ -61,10 +61,11 @@ class DashScopeClient:
 
     def chat_omni_stream(self, messages: Sequence[dict], **kwargs) -> Iterator[str]:
         """
-        以流式方式调用对话模型，并逐块返回文本内容。
+        以流式方式调用对话模型。
+        核心修复：当前使用的是"qwen-flash"，为了适配之前的omni，需要调整为对外暴露一个标准的“增量式”数据流。
         """
         response_generator = self._call_and_validate_api(
-            self._multimodal.call,
+            self._generation.call,
             log_message=f"Chat Stream ({self.settings.model_chat})",
             model=self.settings.model_chat,
             messages=list(messages),
@@ -73,27 +74,32 @@ class DashScopeClient:
             **kwargs,
         )
 
+        # --- 核心修复：在这里处理数据流格式转换 ---
+        previous_content = ""
         for response in response_generator:
             if response.status_code == HTTPStatus.OK:
-                text_chunk = self._extract_text(response)
-                if text_chunk:
-                    yield text_chunk
+                # 1. 提取当前收到的完整文本
+                full_content = self._extract_text(response)
+                
+                # 2. 计算出本次新增的文本 (delta)
+                # 使用 startswith 确保是连续的流
+                if full_content.startswith(previous_content):
+                    delta_chunk = full_content[len(previous_content):]
+                else: # 如果流不连续，则将当前全部内容视为增量
+                    delta_chunk = full_content
+
+                # 3. 对外只 yield 增量部分
+                if delta_chunk:
+                    yield delta_chunk
+                
+                # 4. 更新“上一次”的内容
+                previous_content = full_content
             else:
                 error_message = f"DashScope Stream Error: {response.message} (Code: {response.code})"
                 self._logger.error(error_message)
-                yield f"\n\n❌ **错误**: {error_message}"
+                yield f"\n\n **错误**: {error_message}"
                 break
 
-    def chat_omni(self, messages: Sequence[dict], **kwargs) -> str:
-        response = self._call_and_validate_api(
-            self._multimodal.call,
-            log_message=f"Chat ({self.settings.model_chat})",
-            model=self.settings.model_chat,
-            messages=list(messages),
-            result_format="text",
-            **kwargs,
-        )
-        return self._extract_text(response) or ""
 
     def embed_texts(self, texts: Iterable[str]) -> List[List[float]]:
         payload = [text for text in texts if text and not text.isspace()]
@@ -156,24 +162,20 @@ class DashScopeClient:
         return {}
 
     def _extract_text(self, response: Any) -> str:
-        # 传入的可能是 response 对象或 output 字典
         output = getattr(response, "output", response)
         data = self._ensure_dict(output)
 
-        # 优先从 DashScope 的标准流式结构中提取
         if choices := data.get("choices"):
             if isinstance(choices, list) and choices:
                 if message := choices[0].get("message"):
                     if isinstance(message, dict):
                         if content := message.get("content"):
-                            # 流式输出的内容有时是列表有时是字符串
                             if isinstance(content, list) and content:
                                 if inner_content := content[0].get("text"):
                                     return str(inner_content)
                             if isinstance(content, str):
                                 return content
 
-        # 兼容非流式和一些旧的流式格式
         if text := data.get("text"):
             return str(text)
 

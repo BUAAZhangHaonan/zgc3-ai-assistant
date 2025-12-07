@@ -27,4 +27,3 @@ cache/search_cache.json
 # Tools
 .ruff_cache/
 .pytest_cache/
-
