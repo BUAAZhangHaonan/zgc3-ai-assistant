@@ -1,0 +1,29 @@
+# Python & bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.log
+
+# Virtual environments & local overrides
+.env
+.env.*
+.venv/
+env/
+venv/
+.idea/
+.vscode/
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Project artifacts
+rag_index/
+*.faiss
+*.npy
+cache/search_cache.json
+
+# Tools
+.ruff_cache/
+.pytest_cache/
