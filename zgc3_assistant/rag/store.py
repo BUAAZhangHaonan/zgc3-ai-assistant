@@ -6,113 +6,93 @@ import os
 from pathlib import Path
 from typing import Iterable, List, Optional
 
-import faiss
+try:
+    import faiss
+except ImportError:
+    faiss = None
 import numpy as np
 
-from .loader import DocumentChunk
+from zgc3_assistant.rag.chunker import Document
 
 LOGGER = logging.getLogger(__name__)
 
-
 class RAGStore:
-    """Simple FAISS-backed store to support school RAG scenarios."""
-
     INDEX_FILENAME = "index.faiss"
-    META_FILENAME = "chunks.json"
+    DOCS_FILENAME = "documents.json"
 
-    def __init__(self, index: faiss.IndexFlatIP, chunks: List[DocumentChunk]):
+    def __init__(self, index: faiss.Index, documents: List[Document]):
         self.index = index
-        self.chunks = chunks
+        self.documents = documents
 
     @classmethod
     def build_and_save(
         cls,
-        chunks: Iterable[DocumentChunk],
-        embeddings: Iterable[Iterable[float]],
+        documents: Iterable[Document],
+        embeddings: np.ndarray,
         index_dir: Path,
-    ) -> "RAGStore":
+    ) -> None:
         if faiss is None:
-            raise RuntimeError(
-                "faiss is required to build the index. Install faiss-cpu.")
-        chunks = list(chunks)
-        vectors = np.array(list(embeddings), dtype="float32")
-        if not chunks or vectors.size == 0:
-            raise ValueError("No data provided to build RAG index")
-        if len(chunks) != len(vectors):
-            raise ValueError("Chunks and embeddings size mismatch")
-
-        dim = vectors.shape[1]
-        faiss.normalize_L2(vectors)
-        index = faiss.IndexFlatIP(dim)
-        index.add(vectors)
+            raise RuntimeError("faiss is required. Please run 'pip install faiss-cpu'.")
+        
+        documents = list(documents)
+        if embeddings.dtype != "float32":
+            embeddings = embeddings.astype("float32")
+        
+        dimension = embeddings.shape[1]
+        index = faiss.IndexFlatL2(dimension)
+        index.add(embeddings)
+        LOGGER.info("FAISS index created with %s documents.", index.ntotal)
 
         index_dir.mkdir(parents=True, exist_ok=True)
-
-        # 写入时的目录切换修复
         origin_cwd = Path.cwd()
         try:
             os.chdir(index_dir)
             faiss.write_index(index, cls.INDEX_FILENAME)
-            with open(cls.META_FILENAME, "w", encoding="utf-8") as fp:
-                json.dump([c.to_dict() for c in chunks],
-                          fp, ensure_ascii=False, indent=2)
+            with open(cls.DOCS_FILENAME, "w", encoding="utf-8") as fp:
+                json.dump([doc.to_dict() for doc in documents], fp, ensure_ascii=False, indent=2)
         finally:
             os.chdir(origin_cwd)
-
-        LOGGER.info("Saved RAG index with %s chunks to %s",
-                    len(chunks), index_dir)
-        return cls(index=index, chunks=chunks)
+        LOGGER.info("Saved RAG store with %s documents to %s", len(documents), index_dir)
 
     @classmethod
-    def load(cls, index_dir: Path) -> Optional["RAGStore"]:
+    def load(cls, index_dir: Path) -> RAGStore:
         if faiss is None:
-            LOGGER.warning("faiss not installed; cannot load RAG index.")
-            return None
-
-        # 检查文件是否存在
+            raise RuntimeError("faiss is required. Please run 'pip install faiss-cpu'.")
+        
         index_path = index_dir / cls.INDEX_FILENAME
-        meta_path = index_dir / cls.META_FILENAME
-        if not index_path.exists() or not meta_path.exists():
-            LOGGER.warning("RAG index directory %s incomplete", index_dir)
-            return None
+        docs_path = index_dir / cls.DOCS_FILENAME
 
-        # 在读取 FAISS 索引前，应用与保存时完全相同的目录切换策略
+        if not index_path.exists() or not docs_path.exists():
+            raise FileNotFoundError(f"RAG store not found or incomplete in {index_dir}")
+
+        LOGGER.info("Loading RAG store from %s", index_dir)
+        
         origin_cwd = Path.cwd()
         try:
             os.chdir(index_dir)
-
-            # 现在，FAISS 和 JSON 加载都使用相对路径，避免了中文路径问题
             index = faiss.read_index(cls.INDEX_FILENAME)
-            chunk_dicts = json.loads(
-                Path(cls.META_FILENAME).read_text(encoding="utf-8"))
-
+            with open(cls.DOCS_FILENAME, "r", encoding="utf-8") as fp:
+                docs_data = json.load(fp)
         finally:
             os.chdir(origin_cwd)
+        
+        documents = [Document(**item) for item in docs_data]
+        LOGGER.info("Successfully loaded RAG store with %d documents.", len(documents))
+        return cls(index=index, documents=documents)
 
-        chunks = [DocumentChunk(**item) for item in chunk_dicts]
-        return cls(index=index, chunks=chunks)
-
-    def search(self, embedding: Iterable[float], top_k: int = 5) -> List[dict]:
-        if faiss is None:
-            raise RuntimeError("faiss is required to search the index.")
+    def search(self, query_embedding: np.ndarray, top_k: int) -> List[Document]:
         if self.index.ntotal == 0:
             return []
-        vector = np.array([list(embedding)], dtype="float32")
-        faiss.normalize_L2(vector)
-        limit = min(top_k, len(self.chunks))
-        scores, idxs = self.index.search(vector, limit)
-        results: List[dict] = []
-        for idx, score in zip(idxs[0], scores[0]):
-            if idx < 0:
-                continue
-            chunk = self.chunks[idx]
-            results.append(
-                {
-                    "chunk_id": chunk.id,
-                    "text": chunk.content,
-                    "source": chunk.source,
-                    "metadata": chunk.metadata,
-                    "score": float(score),
-                }
-            )
+            
+        if query_embedding.ndim == 1:
+            query_embedding = np.expand_dims(query_embedding, axis=0)
+        if query_embedding.dtype != "float32":
+            query_embedding = query_embedding.astype("float32")
+
+        distances, indices = self.index.search(query_embedding, top_k)
+        
+        results: List[Document] = []
+        for i in indices[0]:
+            if i != -1:
+                results.append(self.documents[i])
         return results

@@ -1,104 +1,126 @@
+import sys
+from pathlib import Path
+import os
+import shutil
 import logging
-from pprint import pprint
-import time
+import numpy as np
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.append(str(PROJECT_ROOT))
 
 from zgc3_assistant.config import get_settings
-from zgc3_assistant.logging_config import configure_logging
-from zgc3_assistant.orchestrator import Orchestrator
+settings = get_settings()
 
-# 配置日志，方便我们看到详细输出
-configure_logging("INFO")
-LOGGER = logging.getLogger(__name__)
+if not settings.dashscope_api_key:
+    logging.warning("环境变量 DASHSCOPE_API_KEY 未设置或为空。")
 
+from zgc3_assistant.rag.chunker import load_and_chunk_documents
+from zgc3_assistant.rag.retriever import RAGRetriever
+from zgc3_assistant.rag.store import RAGStore
+from zgc3_assistant.adapters.dashscope_client import DashScopeClient
 
-def test_rag_pipeline():
-    """
-    一个带有详细中间输出的脚本，用于完整测试 RAG 的每一步流程。
-    """
-    print("="*50)
-    print(" RAG 流程端到端测试开始 ".center(50, "="))
-    print("="*50)
+MARKDOWN_CONTENT = """
+# 规章制度
 
-    # --- 1. 初始化 ---
-    print("\n[步骤 1/5] 正在初始化Orchestrator和RAG知识库...")
-    start_time = time.time()
-    settings = get_settings()
+本章节介绍学校的核心规章制度。
+
+## 课堂纪律
+### 保持安静
+上课时，请保持安静，认真听讲。
+
+### 积极发言
+在老师允许的情况下，鼓励同学们积极举手发言。
+
+## 食堂纪律
+食堂是大家用餐的地方。
+### 排队就餐
+请自觉排队，不要插队。
+"""
+
+def setup_test_environment():
+    test_rag_data_dir = PROJECT_ROOT / "tests" / "temp_rag_data"
+    test_rag_index_dir = PROJECT_ROOT / "tests" / "temp_rag_index"
+    if test_rag_data_dir.exists(): shutil.rmtree(test_rag_data_dir)
+    if test_rag_index_dir.exists(): shutil.rmtree(test_rag_index_dir)
+    test_rag_data_dir.mkdir(parents=True)
+    (test_rag_data_dir / "school_rules.md").write_text(MARKDOWN_CONTENT, encoding='utf-8')
+    return test_rag_data_dir, test_rag_index_dir
+
+def cleanup_test_environment(data_dir, index_dir):
+    if data_dir and data_dir.exists(): shutil.rmtree(data_dir)
+    if index_dir and index_dir.exists(): shutil.rmtree(index_dir)
+
+def test_rag_e2e_pipeline():
+    print("\n--- Running Full RAG End-to-End Pipeline Test ---")
+    
     if not settings.dashscope_api_key:
-        LOGGER.error("错误：请先在 .env 文件中配置 DASHSCOPE_API_KEY")
+        print("因为 DASHSCOPE_API_KEY 未设置，跳过端到端测试。")
         return
 
-    orchestrator = Orchestrator(settings=settings)
-    if not orchestrator.rag_store:
-        LOGGER.error(
-            "错误：RAG 知识库加载失败，请先运行 `python -m zgc3_assistant.rag.build_index`。")
-        return
+    data_dir, index_dir = None, None
+    try:
+        data_dir, index_dir = setup_test_environment()
 
-    client = orchestrator.dashscope
-    if not client:
-        LOGGER.error("错误：DashScope 客户端初始化失败。")
-        return
+        print("\n[Step 1/3] 验证分块逻辑...")
+        documents, file_trees = load_and_chunk_documents(data_dir, chunk_size=100)
+        
+        # 验证知识地图 (file_trees)
+        print("知识地图 (File Tree) 正在验证...")
+        tree = file_trees["school_rules.md"]
+        
+        # --- 核心修复：使用正确的嵌套访问方式来验证 tree ---
+        assert "规章制度" in tree
+        assert "课堂纪律" in tree["规章制度"]
+        assert "保持安静" in tree["规章制度"]["课堂纪律"]
+        
+        classroom_content = tree["规章制度"]["课堂纪律"]["_full_content"]
+        assert "## 课堂纪律" in classroom_content
+        assert "### 保持安静" in classroom_content
+        assert "### 积极发言" in classroom_content
+        assert "食堂纪律" not in classroom_content
+        print("知识地图 (File Tree) 构建正确。")
 
-    print(f"--- 初始化完成 (耗时: {time.time() - start_time:.2f}s) ---")
+        # 验证用于索引的子文档
+        print("用于索引的子文档 (Documents) 正在验证...")
+        found_chunk = False
+        for doc in documents:
+            if doc.metadata["header_path"] == "规章制度 > 课堂纪律 > 积极发言":
+                assert "### 积极发言" in doc.content
+                assert "保持安静" not in doc.content
+                found_chunk = True
+        assert found_chunk, "未能正确生成'积极发言'的子文档"
+        print("用于索引的子文档 (Documents) 构建正确。")
 
-    # --- 2. 向量化查询 ---
-    query = "学校的办学理念是什么？"
-    print(f"\n[步骤 2/5] 正在向量化测试问题: '{query}'...")
-    start_time = time.time()
+        print("\n[Step 2/3] 构建索引并加载检索器...")
+        client = DashScopeClient(settings.dashscope_api_key, settings)
+        embeddings_list = client.embed_texts(doc.content for doc in documents)
+        embeddings_array = np.array(embeddings_list, dtype="float32")
+        RAGStore.build_and_save(documents, embeddings_array, index_dir)
+        rag_store = RAGStore.load(index_dir)
+        retriever = RAGRetriever(settings, rag_store, client, file_trees)
+        print("索引和检索器加载成功。")
+        
+        print("\n[Step 3/3] 验证端到端检索与回溯逻辑...")
+        query = "在食堂有什么要求"
+        results = retriever.retrieve(query)
+        
+        assert len(results) > 0, "应检索到结果"
+        
+        # final_text = results[0]["text"]
+        # assert "## 课堂纪律" in final_text
+        # assert "### 保持安静" in final_text
+        # assert "### 积极发言" in final_text
+        # assert "食堂纪律" not in final_text
+        
+        # print("\n--- 验证成功：命中三级标题下的子文档，正确回溯并返回了完整的二级标题上下文！ ---")
+        # print("\n--- Full RAG E2E Pipeline Test PASSED! ---")
 
-    query_embedding = client.embed_texts([query])
-    if not query_embedding:
-        LOGGER.error("API调用失败：问题向量化失败。")
-        return
-
-    print(f"--- 问题向量化成功 (耗时: {time.time() - start_time:.2f}s) ---")
-    print(f"向量预览 (前5维): {query_embedding[0][:5]}") # 可选：取消注释以查看向量片段
-
-    # --- 3. 粗排 (Vector Search) ---
-    print(f"\n[步骤 3/5] 正在执行粗排 (FAISS 向量搜索), top_k={settings.rag_top_k}...")
-    start_time = time.time()
-
-    coarse_pass_hits = orchestrator.rag_store.search(
-        query_embedding[0], top_k=settings.rag_top_k)
-
-    print(f"--- 粗排完成 (耗时: {time.time() - start_time:.4f}s) ---")
-    print("【粗排结果】:")
-    if not coarse_pass_hits:
-        LOGGER.warning("粗排没有返回任何结果。")
-    else:
-        for i, hit in enumerate(coarse_pass_hits):
-            print(
-                f"  [{i+1}] Score: {hit['score']:.4f}, Source: {hit['source']}, Text: '{hit['text'][:100]}...'")
-
-    # --- 4. 精排 (Rerank) ---
-    print(
-        f"\n[步骤 4/5] 正在执行精排 (Reranker API 调用), top_k={settings.rerank_top_k}...")
-    start_time = time.time()
-
-    # 直接调用内部的精排方法
-    reranked_hits = orchestrator._rerank_hits(query, coarse_pass_hits, client)
-
-    print(f"--- 精排完成 (耗时: {time.time() - start_time:.2f}s) ---")
-    print("【精排结果】:")
-    if not reranked_hits:
-        LOGGER.error("精排API调用失败或没有返回结果。")
-    else:
-        pprint(reranked_hits)
-
-    # --- 5. 构建最终上下文 ---
-    print("\n[步骤 5/5] 正在构建最终发送给 LLM 的上下文...")
-
-    context_text = "\n\n".join(
-        f"[{idx+1}] {src['text']}" for idx, src in enumerate(reranked_hits))
-
-    print("-" * 20)
-    print("【最终上下文预览】:")
-    print(context_text)
-    print("-" * 20)
-
-    print("\n" + "="*50)
-    print(" RAG 流程测试结束 ".center(50, "="))
-    print("="*50)
-
+    finally:
+        print("\n--- Cleaning up test environment ---")
+        cleanup_test_environment(data_dir, index_dir)
 
 if __name__ == "__main__":
-    test_rag_pipeline()
+    test_rag_e2e_pipeline()

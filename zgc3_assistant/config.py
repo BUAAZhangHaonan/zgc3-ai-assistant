@@ -18,16 +18,16 @@ class Settings(BaseSettings):
     dashscope_api_key: Optional[str] = Field(
         default=None, alias="DASHSCOPE_API_KEY")
 
-    model_chat: str = "qwen3-omni-flash"
-    # model_chat: str = "qwen-flash"
+    #model_chat: str = "qwen3-omni-flash"
+    model_chat: str = "qwen-flash"
     model_embedding: str = "text-embedding-v4"
     model_rerank: str = "qwen3-rerank"
     model_image: str = "qwen-image-plus"
     model_i2v: str = "wan2.5-i2v-preview"
 
-    rag_chunk_size: int = 250
-    rag_top_k: int = 10
-    rerank_top_k: int = 3
+    rag_chunk_size: int = 200
+    rag_top_k: int = 15
+    rerank_top_k: int = 4
 
     enable_show_sources: bool = False  # 是否在回答末尾显示“参考资料”板块
     enable_ytdlp: bool = True
